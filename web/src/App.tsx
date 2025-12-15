@@ -16,6 +16,12 @@ const STOPWORDS = new Set([
   "where","which","who","will","with","would","you","your"
 ]);
 
+const LOCAL_STORAGE_KEY = "emerson_user_dictionary_v1";
+
+function normalizeWord(word: string): string {
+  return word.trim().toLowerCase();
+}
+
 function escapeRegExp(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -52,26 +58,64 @@ function extractExampleSentence(text: string, word: string): string {
   return sentence.length > 0 ? sentence : "No example found in your text.";
 }
 
+function loadUserDictionary(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    if (!parsed || typeof parsed !== "object") return {};
+
+    const cleaned: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      const nk = normalizeWord(k);
+      const nv = (v ?? "").toString().trim();
+      if (nk && nv) cleaned[nk] = nv;
+    }
+    return cleaned;
+  } catch {
+    return {};
+  }
+}
+
+function saveUserDictionary(dict: Record<string, string>) {
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dict));
+}
+
 export default function App() {
   const [mode, setMode] = useState<"upload" | "results">("upload");
   const [fileName, setFileName] = useState<string>("");
   const [uploadedText, setUploadedText] = useState<string>("");
 
+  // user-editable dictionary stored in localStorage
+  const [userDict, setUserDict] = useState<Record<string, string>>(() => loadUserDictionary());
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const dictMap = useMemo(() => {
+  // bundled dictionary (read-only)
+  const baseDictMap = useMemo(() => {
     const raw = dictionaryData as Record<string, DictEntry>;
     const m = new Map<string, string>();
     for (const [word, entry] of Object.entries(raw)) {
-      m.set(word.toLowerCase(), entry.definition || "No definition available");
+      const key = normalizeWord(word);
+      const def = (entry?.definition ?? "").toString().trim();
+      if (key && def) m.set(key, def);
     }
     return m;
   }, []);
+
+  // merged dictionary: user overrides base
+  const combinedDictMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const [k, v] of baseDictMap.entries()) m.set(k, v);
+    for (const [k, v] of Object.entries(userDict)) m.set(normalizeWord(k), v);
+    return m;
+  }, [baseDictMap, userDict]);
 
   const results: UncommonWord[] = useMemo(() => {
     if (!uploadedText) return [];
 
     const tokens = tokenize(uploadedText);
+
     const counts = new Map<string, number>();
     for (const t of tokens) counts.set(t, (counts.get(t) ?? 0) + 1);
 
@@ -84,21 +128,22 @@ export default function App() {
       .sort((a, b) => {
         const [wa, ca] = a;
         const [wb, cb] = b;
-        if (ca !== cb) return ca - cb;
-        if (wa.length !== wb.length) return wb.length - wa.length;
+        if (ca !== cb) return ca - cb; // rarer first
+        if (wa.length !== wb.length) return wb.length - wa.length; // longer first
         return wa.localeCompare(wb);
       })
       .slice(0, 75);
 
     return candidates.map(([word]) => {
-      const def = dictMap.get(word.toLowerCase()) ?? "Not in your dictionary yet.";
+      const key = normalizeWord(word);
+      const def = combinedDictMap.get(key) ?? "Not in your dictionary yet.";
       return {
         word,
         definition: def,
         exampleFromText: extractExampleSentence(uploadedText, word),
       };
     });
-  }, [uploadedText, dictMap]);
+  }, [uploadedText, combinedDictMap]);
 
   async function handleFile(file: File) {
     const text = await file.text();
@@ -127,9 +172,32 @@ export default function App() {
     void handleFile(file);
   }
 
+  function upsertUserDefinition(word: string, definition: string) {
+    const w = normalizeWord(word);
+    const d = definition.trim();
+    if (!w || !d) return;
+
+    setUserDict((prev) => {
+      const next = { ...prev, [w]: d };
+      saveUserDictionary(next);
+      return next;
+    });
+  }
+
+  function removeUserWord(word: string) {
+    const w = normalizeWord(word);
+    if (!w) return;
+
+    setUserDict((prev) => {
+      const next = { ...prev };
+      delete next[w];
+      saveUserDictionary(next);
+      return next;
+    });
+  }
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-purple-50 via-white to-amber-50 px-6 py-6">
-      {/* Full-width wrapper; centered content that can expand */}
       <div className="w-full max-w-6xl mx-auto">
         <h1 className="text-4xl md:text-5xl font-bold text-purple-900 mb-8">
           Emerson&apos;s Dictionary
@@ -169,13 +237,14 @@ export default function App() {
             </div>
           </div>
         ) : (
-          <div className="w-full">
-            <ResultsDisplay
-              results={results}
-              fileName={fileName || "Uploaded Text"}
-              onReset={onReset}
-            />
-          </div>
+          <ResultsDisplay
+            results={results}
+            fileName={fileName || "Uploaded Text"}
+            onReset={onReset}
+            userDictionary={userDict}
+            onSaveDefinition={upsertUserDefinition}
+            onRemoveUserWord={removeUserWord}
+          />
         )}
       </div>
     </div>
