@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ---- Hard reset for full-screen layout ---- */
+/* ---- Full-screen layout reset ---- */
 html,
 body {
   width: 100%;
@@ -18,7 +18,6 @@ body {
   padding: 0;
 }
 
-/* Optional: prevent accidental horizontal scroll from shadows/padding */
 body {
   overflow-x: hidden;
 }
