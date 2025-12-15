@@ -2,11 +2,10 @@ from __future__ import annotations
 
 """
 Emerson's Dictionary — PDF vocabulary miner.
-
 This code helps you build a personal vocabulary dictionary:
   - Extracts text from a PDF
   - Cleans common PDF artifacts
-  - Finds rare-but-real English words you don't already have in emerson_dictionary.json
+  - Finds rare-but-real English words you don't already have
   - Asks you interactively whether to add each word to "Emerson's Dictionary"
 """
 
@@ -28,11 +27,11 @@ nltk.download("omw-1.4", quiet=True)
 
 # project paths
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DICT_PATH = PROJECT_ROOT / "data" / "emerson_dictionary.json"
+# UPDATED: Save directly to web/src/ so the React app can import it [cite: 11, 12]
+DICT_PATH = PROJECT_ROOT / "web" / "src" / "emerson_dictionary.json"
 
 # regex tokenizer: alphabetic words only
 WORD_PATTERN = re.compile(r"[A-Za-z]+")
-
 
 
 # Dictionary load & save
@@ -110,16 +109,6 @@ def is_candidate_word(
 ) -> bool:
     """
     Decide if a word is a candidate for learning
-
-    Criteria:
-      - minimum length
-      - not already in Emerson's Dictionary
-      - ignore ALL CAPS (likely acronyms)
-      - must exist in WordNet
-      - must have a *reasonable* global frequency:
-          - not 0 (completely unseen)
-          - not too low (likely garbage OCR)
-          - not too high (too common to be interesting)
     """
     w = word.lower()
 
@@ -164,10 +153,6 @@ def get_candidate_words(
 ) -> List[str]:
     """
     From cleaned text, return a ranked list of candidate vocabulary words
-
-    Ranking:
-      1. Rarer global frequency (lower Zipf frequency first)
-      2. Higher count in the document
     """
     tokens = tokenize(text)
     counts: Counter[str] = Counter(w.lower() for w in tokens)
@@ -227,11 +212,7 @@ def review_candidates_interactively(
     freq_threshold: float = 3.5,
 ) -> None:
     """
-    Main interactive loop:
-      - load dictionary
-      - extract + clean text from PDF
-      - find candidate words
-      - for each word: show definition + example, ask to add/skip/quit
+    Main interactive loop
     """
     print(f"Loading Emerson's Dictionary from: {DICT_PATH}")
     emerson_dict = load_emerson_dict()
