@@ -1,15 +1,12 @@
 import { useMemo, useRef, useState } from "react";
 import { ResultsDisplay } from "./components/ResultsDisplay";
 import type { UncommonWord } from "./types";
-
-// Your dictionary JSON (word -> { definition, ... })
 import dictionaryData from "./emerson_dictionary.json";
 
 type DictEntry = {
   definition?: string;
 };
 
-// Small, practical stopword list so we don’t “discover” junk like “between”, “within”, etc.
 const STOPWORDS = new Set([
   "a","an","and","are","as","at","be","been","but","by","can","could","did","do","does",
   "for","from","had","has","have","he","her","hers","him","his","how","i","if","in","into",
@@ -34,7 +31,6 @@ function extractExampleSentence(text: string, word: string): string {
   const idx = lower.search(new RegExp(`\\b${escapeRegExp(w)}\\b`, "i"));
   if (idx === -1) return "No example found in your text.";
 
-  // Find sentence-ish boundaries around the match
   let start = idx;
   while (start > 0) {
     const ch = text[start - 1];
@@ -63,7 +59,6 @@ export default function App() {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Dictionary lookup (lowercased keys) so we can enrich detected words when possible
   const dictMap = useMemo(() => {
     const raw = dictionaryData as Record<string, DictEntry>;
     const m = new Map<string, string>();
@@ -73,39 +68,24 @@ export default function App() {
     return m;
   }, []);
 
-  /**
-   * KEY CHANGE:
-   * We now detect "uncommon-ish" words FROM THE UPLOADED TEXT,
-   * rather than intersecting with your existing dictionary.
-   *
-   * Heuristic:
-   * - keep alphabetical tokens
-   * - filter stopwords
-   * - length >= 8 (tweakable)
-   * - rank rarer first (lower count), then longer
-   */
   const results: UncommonWord[] = useMemo(() => {
     if (!uploadedText) return [];
 
     const tokens = tokenize(uploadedText);
-
     const counts = new Map<string, number>();
     for (const t of tokens) counts.set(t, (counts.get(t) ?? 0) + 1);
 
     const candidates = [...counts.entries()]
       .filter(([w]) => {
         if (STOPWORDS.has(w)) return false;
-        if (w.length < 8) return false; // tweak to 7/9 if you want
+        if (w.length < 8) return false;
         return true;
       })
       .sort((a, b) => {
         const [wa, ca] = a;
         const [wb, cb] = b;
-        // rarer first
         if (ca !== cb) return ca - cb;
-        // longer first
         if (wa.length !== wb.length) return wb.length - wa.length;
-        // alphabetical
         return wa.localeCompare(wb);
       })
       .slice(0, 75);
@@ -148,20 +128,21 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-amber-50 p-6">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-purple-900 mb-6">
+    <div className="min-h-screen w-full bg-gradient-to-br from-purple-50 via-white to-amber-50 px-6 py-6">
+      {/* Full-width wrapper; centered content that can expand */}
+      <div className="w-full max-w-6xl mx-auto">
+        <h1 className="text-4xl md:text-5xl font-bold text-purple-900 mb-8">
           Emerson&apos;s Dictionary
         </h1>
 
         {mode === "upload" ? (
-          <div className="border-3 border-purple-400 rounded-xl bg-white shadow-lg p-8">
+          <div className="w-full rounded-2xl bg-white shadow-lg p-8 border-2 border-purple-300">
             <div
               onDragOver={(e) => e.preventDefault()}
               onDrop={onDrop}
-              className="border-2 border-dashed border-purple-300 rounded-xl p-10 bg-gradient-to-br from-purple-50 to-amber-50"
+              className="w-full rounded-2xl border-2 border-dashed border-purple-300 p-10 bg-gradient-to-br from-purple-50 to-amber-50"
             >
-              <p className="text-purple-900 text-lg font-semibold mb-2">
+              <p className="text-purple-900 text-xl font-semibold mb-2">
                 Drag &amp; drop a .txt file to analyze
               </p>
               <p className="text-purple-700 mb-6">
@@ -188,11 +169,13 @@ export default function App() {
             </div>
           </div>
         ) : (
-          <ResultsDisplay
-            results={results}
-            fileName={fileName || "Uploaded Text"}
-            onReset={onReset}
-          />
+          <div className="w-full">
+            <ResultsDisplay
+              results={results}
+              fileName={fileName || "Uploaded Text"}
+              onReset={onReset}
+            />
+          </div>
         )}
       </div>
     </div>
