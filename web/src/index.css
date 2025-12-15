@@ -1,8 +1,18 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-/* ---- Full-screen layout reset ---- */
+/* Keep the same “global quality” settings you had, but remove the layout constraints. */
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* FULL-SCREEN FIX (this is the part you wanted added) */
 html,
 body {
   width: 100%;
@@ -11,6 +21,7 @@ body {
   padding: 0;
 }
 
+/* Make sure the React root can expand across the full viewport */
 #root {
   width: 100%;
   min-height: 100vh;
@@ -18,6 +29,18 @@ body {
   padding: 0;
 }
 
+/* IMPORTANT: remove the Vite template centering/flex layout */
 body {
+  min-width: 320px;
+  min-height: 100vh;
   overflow-x: hidden;
+}
+
+/* Keep link styling (harmless) */
+a {
+  font-weight: 500;
+  text-decoration: inherit;
+}
+a:hover {
+  opacity: 0.9;
 }
